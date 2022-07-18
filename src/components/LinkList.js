@@ -1,33 +1,9 @@
 import React from 'react';
 import Link from './Link';
-import { useQuery, gql } from '@apollo/client';
 import { LINKS_PER_PAGE } from '../constants';
-import { useLocation, useNavigate } from 'react-router-dom';
 
-export const FEED_QUERY = gql`
-	query FeedQuery($take: Int, $skip: Int, $orderBy: LinkOrderByInput) {
-		feed(take: $take, skip: $skip, orderBy: $orderBy) {
-			id
-			links {
-				id
-				createdAt
-				url
-				description
-				postedBy {
-					id
-					name
-				}
-				votes {
-					id
-					user {
-						id
-					}
-				}
-			}
-			count
-		}
-	}
-`;
+import { useQuery, gql } from '@apollo/client';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const NEW_LINKS_SUBSCRIPTION = gql`
 	subscription {
@@ -77,30 +53,59 @@ const NEW_VOTES_SUBSCRIPTION = gql`
 	}
 `;
 
-const LinkList = () => {
-	const navigate = useNavigate();
-	const getLinksToRender = (isNewPage, data) => {
-		if (isNewPage) {
-			return data.feed.links;
+export const FEED_QUERY = gql`
+	query FeedQuery($take: Int, $skip: Int, $orderBy: LinkOrderByInput) {
+		feed(take: $take, skip: $skip, orderBy: $orderBy) {
+			id
+			links {
+				id
+				createdAt
+				url
+				description
+				postedBy {
+					id
+					name
+				}
+				votes {
+					id
+					user {
+						id
+					}
+				}
+			}
+			count
 		}
-		const rankedLinks = data.feed.links.slice();
-		rankedLinks.sort((l1, l2) => l2.votes.length - l1.votes.length);
-		return rankedLinks;
-	};
-	const getQueryVariables = (isNewPage, page) => {
-		const skip = isNewPage ? (page - 1) * LINKS_PER_PAGE : 0;
-		const take = isNewPage ? LINKS_PER_PAGE : 100;
-		const orderBy = { createdAt: 'desc' };
-		return { take, skip, orderBy };
-	};
-	const { data, loading, error, subscribeToMore } = useQuery(FEED_QUERY, {
-		variables: getQueryVariables(isNewPage, page),
-	});
+	}
+`;
+
+const getQueryVariables = (isNewPage, page) => {
+	const skip = isNewPage ? (page - 1) * LINKS_PER_PAGE : 0;
+	const take = isNewPage ? LINKS_PER_PAGE : 100;
+	const orderBy = { createdAt: 'desc' };
+	return { take, skip, orderBy };
+};
+
+const getLinksToRender = (isNewPage, data) => {
+	if (isNewPage) {
+		return data.feed.links;
+	}
+	const rankedLinks = data.feed.links.slice();
+	rankedLinks.sort((l1, l2) => l2.votes.length - l1.votes.length);
+	return rankedLinks;
+};
+
+const LinkList = ({ client }) => {
+	const navigate = useNavigate();
 	const location = useLocation();
 	const isNewPage = location.pathname.includes('new');
 	const pageIndexParams = location.pathname.split('/');
 	const page = parseInt(pageIndexParams[pageIndexParams.length - 1]);
 	const pageIndex = page ? (page - 1) * LINKS_PER_PAGE : 0;
+
+	const { data, loading, error, subscribeToMore } = useQuery(FEED_QUERY, {
+		variables: getQueryVariables(isNewPage, page),
+	});
+
 	subscribeToMore({
 		document: NEW_LINKS_SUBSCRIPTION,
 		updateQuery: (prev, { subscriptionData }) => {
@@ -118,21 +123,10 @@ const LinkList = () => {
 			});
 		},
 	});
+
 	subscribeToMore({
 		document: NEW_VOTES_SUBSCRIPTION,
 	});
-	const linksToRender = [
-		{
-			id: 'link-id-1',
-			description: 'Prisma gives you a powerful database toolkit 😎',
-			url: 'https://prisma.io',
-		},
-		{
-			id: 'link-id-2',
-			description: 'The best GraphQL client',
-			url: 'https://www.apollographql.com/docs/react/',
-		},
-	];
 
 	return (
 		<>
